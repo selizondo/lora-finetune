@@ -1,0 +1,48 @@
+# config.yaml — Hyperparameters for QLoRA fine-tuning
+
+model:
+  base: "mistralai/Mistral-7B-v0.1"     # swap to "meta-llama/Meta-Llama-3-8B" if preferred
+  load_in_4bit: true
+  bnb_4bit_compute_dtype: "float16"
+  bnb_4bit_quant_type: "nf4"
+  use_nested_quant: false
+
+lora:
+  r: 16                    # rank — experiment with 8 and 64
+  alpha: 32                # scaling: typically 2x rank
+  dropout: 0.05
+  target_modules:
+    - "q_proj"
+    - "v_proj"
+  bias: "none"
+  task_type: "CAUSAL_LM"
+
+training:
+  output_dir: "./checkpoints"
+  num_train_epochs: 3
+  per_device_train_batch_size: 4
+  gradient_accumulation_steps: 4       # effective batch = 16
+  learning_rate: 2.0e-4
+  lr_scheduler_type: "cosine"
+  warmup_ratio: 0.05
+  weight_decay: 0.001
+  fp16: true
+  bf16: false                          # set true on A100, false on T4
+  max_grad_norm: 0.3
+  logging_steps: 10
+  save_strategy: "epoch"
+  evaluation_strategy: "epoch"
+  load_best_model_at_end: true
+  report_to: "none"                    # swap to "wandb" for tracking
+
+data:
+  train_file: "data/train.jsonl"
+  val_file: "data/val.jsonl"
+  max_seq_length: 512
+  val_split: 0.1
+
+inference:
+  max_new_tokens: 512
+  temperature: 0.7
+  top_p: 0.9
+  repetition_penalty: 1.1

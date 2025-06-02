@@ -1,0 +1,13 @@
+# Install in Colab with:
+#   pip install -r requirements.txt
+#
+# Colab already has torch; this adds the fine-tuning stack on top.
+
+transformers>=4.40.0
+peft>=0.10.0
+trl>=0.8.6
+bitsandbytes>=0.43.0
+accelerate>=0.29.0
+datasets>=2.19.0
+scipy>=1.13.0
+pyyaml>=6.0
