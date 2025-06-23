@@ -6,16 +6,35 @@ QLoRA fine-tuning of Mistral-7B on ML interview Q&A. The primary goal is underst
 
 ---
 
+## Quick Start
+
+**Requires a GPU (16GB+ VRAM). Use free Colab A100 if no local GPU.**
+
+```bash
+# ── Option A: Colab A100 (recommended, free tier) ────────────────────────────
+# 1. Open a new Colab notebook, set runtime to A100
+# 2. Clone the repo and install deps:
+!git clone <your-repo-url> && cd lora-finetune
+!pip install -r requirements.txt
+
+# ── Option B: Local GPU (RTX 3090/4090, 24GB) ─────────────────────────────
+source ~/.venvs/newline/bin/activate
+pip install trl bitsandbytes accelerate  # not in shared venv — GPU-only deps
+
+# ── Run (both options) ────────────────────────────────────────────────────────
+python prepare_dataset.py                # ~8600 examples → data/train.jsonl + val.jsonl
+python train.py                          # QLoRA, ~40 min on A100, saves checkpoints/final/
+python evaluate.py --adapter ./checkpoints/final --mode both
+python inference.py --adapter ./checkpoints/final --interactive
+```
+
+**Cannot run on CPU** — bitsandbytes 4-bit quantization requires CUDA.
+
+---
+
 ## What It Does
 
 Fine-tunes a 7B-parameter model using QLoRA (4-bit base + LoRA adapters) so it answers ML interview questions in a consistent, concise technical style. Runs on a single 16GB GPU or free Colab A100 (~40 min for 1000 examples).
-
-```
-python prepare_dataset.py          # download + format ~8600 examples from HuggingFace
-python train.py                    # QLoRA training, saves adapter to ./checkpoints/final
-python evaluate.py --adapter ./checkpoints/final --mode both  # perplexity + qualitative
-python inference.py --adapter ./checkpoints/final --interactive
-```
 
 ---
 
