@@ -47,6 +47,8 @@ Full fine-tuning of Mistral-7B requires ~56GB VRAM (fp16) — beyond a single co
 
 The tradeoff: quantization noise + adapter approximation vs full-parameter expressiveness. For domain adaptation tasks with <10K examples, QLoRA empirically matches full fine-tune quality within noise. It diverges on tasks requiring deep architectural changes.
 
+See [docs/adr-01-qlora-vs-full-finetune.md](docs/adr-01-qlora-vs-full-finetune.md) for the full decision — including when to revisit and switch to full fine-tuning.
+
 ---
 
 ## The Hard Problem: When to Fine-Tune vs RAG
