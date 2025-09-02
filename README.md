@@ -2,20 +2,19 @@
 
 QLoRA fine-tuning of Mistral-7B on ML interview Q&A. The primary goal is understanding *when fine-tuning is worth it* — not just getting training to run.
 
-**Stack:** Python · HuggingFace `peft` + `trl` · `bitsandbytes` 4-bit · Mistral-7B · Colab A100
+**Stack:** Python · HuggingFace `peft` + `trl` · `bitsandbytes` 4-bit · Mistral-7B · Colab T4
 
 ---
 
 ## Quick Start
 
-**Requires a GPU (16GB+ VRAM). Use free Colab A100 if no local GPU.**
+**Requires a GPU (15GB+ VRAM). Free Colab T4 works — no runtime upgrade needed.**
 
 ```bash
-# ── Option A: Colab A100 (recommended, free tier) ────────────────────────────
-# 1. Open a new Colab notebook, set runtime to A100
-# 2. Clone the repo and install deps:
-!git clone <your-repo-url> && cd lora-finetune
-!pip install -r requirements.txt
+# ── Option A: Colab T4 (recommended, free tier default) ──────────────────────
+# 1. Open train_colab.ipynb in Colab — T4 is the default runtime, no change needed
+# 2. Add HF_TOKEN to Colab Secrets (key icon, left sidebar)
+# 3. Run all cells — ~80 min total
 
 # ── Option B: Local GPU (RTX 3090/4090, 24GB) ─────────────────────────────
 source ~/.venvs/newline/bin/activate
@@ -23,7 +22,7 @@ pip install trl bitsandbytes accelerate  # not in shared venv — GPU-only deps
 
 # ── Run (both options) ────────────────────────────────────────────────────────
 python prepare_dataset.py                # ~8600 examples → data/train.jsonl + val.jsonl
-python train.py                          # QLoRA, ~40 min on A100, saves checkpoints/final/
+python train.py                          # QLoRA, ~80 min on T4, saves checkpoints/final/
 python evaluate.py --adapter ./checkpoints/final --mode both
 python inference.py --adapter ./checkpoints/final --interactive
 ```
@@ -34,7 +33,7 @@ python inference.py --adapter ./checkpoints/final --interactive
 
 ## What It Does
 
-Fine-tunes a 7B-parameter model using QLoRA (4-bit base + LoRA adapters) so it answers ML interview questions in a consistent, concise technical style. Runs on a single 16GB GPU or free Colab A100 (~40 min for 1000 examples).
+Fine-tunes a 7B-parameter model using QLoRA (4-bit base + LoRA adapters) so it answers ML interview questions in a consistent, concise technical style. Runs on free Colab T4 (15GB) — no paid GPU needed (~80 min for 1000 examples).
 
 ---
 
@@ -120,20 +119,51 @@ lora-finetune/
 
 ## Hardware Requirements
 
-| Setup | VRAM | Train time (1K examples, 3 epochs) |
-|-------|------|-------------------------------------|
-| Colab A100 (free) | 40GB | ~40 min |
-| RTX 3090/4090 | 24GB | ~50 min |
-| RTX 3080 | 10GB | OOM — reduce batch_size to 2, increase grad_accum to 8 |
-| CPU only | — | Not practical |
+| Setup | VRAM | Train time (1K examples, 3 epochs) | Notes |
+|-------|------|-------------------------------------|-------|
+| Colab T4 (free, default) | 15GB | ~80 min | batch=1, grad_accum=16, seq_len=256 |
+| RTX 3090/4090 | 24GB | ~50 min | batch=4, seq_len=512 |
+| Colab A100 | 40GB | ~40 min | batch=4, seq_len=512 — faster but not required |
+| CPU only | — | Not practical | bitsandbytes requires CUDA |
 
-For CPU-only machines: use the Colab notebook path (`pip install -r requirements.txt` in Colab, then `python train.py`).
+T4 config uses `batch_size=1, gradient_accumulation_steps=16, max_seq_length=256, gradient_checkpointing=True`. Effective batch size identical to larger-GPU config (16). Perplexity numbers in this repo reflect T4 runs at seq_len=256.
+
+---
+
+## Alternative Approaches
+
+Alternatives considered or worth exploring — each trades complexity for capability:
+
+**Unsloth instead of raw SFTTrainer**
+- What: Purpose-built QLoRA library with kernel-level optimizations for T4/A100.
+- Gain: ~2x faster training, ~60% less VRAM. T4 time drops from ~80 min to ~40 min. Near-zero code change — drop-in replacement for `SFTTrainer`.
+- When to use: Any production fine-tune pipeline. The only reason not to use it is if you want full visibility into the training loop (e.g., custom loss, custom data collation).
+
+**Expand LoRA target modules**
+- What: Current config targets `q_proj` + `v_proj` only. Adding `k_proj`, `o_proj`, `gate_proj`, `up_proj` trains more of the model.
+- Gain: ~2–4 perplexity points, better instruction adherence. Adapter grows from ~64MB to ~200MB.
+- When to use: When baseline quality plateaus and more data isn't available.
+
+**GGUF export for deployment**
+- What: Convert the merged model (base + adapter) to GGUF format for `llama.cpp` inference.
+- Gain: ~2GB model file instead of ~14GB. Runs on CPU at acceptable speed (~10 tok/s on M1). No GPU needed for inference.
+- When to use: Shipping the adapter to a device without a GPU, or building a demo that runs locally without Ollama.
+
+**Newer base model (Llama-3-8B-Instruct or Mistral-7B-Instruct-v0.3)**
+- What: Mistral-7B-v0.1 is a base model — it needs more instruction tuning data. Instruct variants already handle formatting; fine-tuning only needs to teach domain knowledge.
+- Gain: Better out-of-the-box instruction following, less training data needed to reach the same quality.
+- Tradeoff: Different chat template (ChatML vs Llama-2). Template mismatch is a silent quality regression — must verify before training.
+
+**DPO after SFT**
+- What: Supervised fine-tuning (SFT) teaches the model to produce outputs matching the training format. Direct Preference Optimization (DPO) teaches it to prefer better outputs over worse ones using paired comparisons.
+- Gain: Better answer quality on subjective dimensions — more concise, better calibrated, less repetitive.
+- Tradeoff: Requires preference-labeled data (chosen/rejected pairs), not just instruction-response pairs. Dataset preparation is the bottleneck.
 
 ---
 
 ## What I'd Do Differently
 
-- **Use a more recent base model** — Mistral-7B-v0.1 is solid but Mistral-7B-Instruct-v0.3 or Llama-3-8B-Instruct would need less instruction-following tuning, leaving more capacity for domain adaptation.
+- **Use Unsloth** — same QLoRA, 2x faster, less VRAM. Should be the default for any T4 run.
 - **Add ROUGE/BERTScore eval** — perplexity is a proxy; task-specific metrics are more honest. Implemented in Project 07 (finetune-case-study) using the eval harness from Project 04.
-- **Flash Attention 2** — reduces memory ~30% and speeds up training. Requires `flash-attn` and an Ampere or newer GPU. Omitted here for compatibility with free Colab T4s.
+- **Expand LoRA targets** — `q_proj` + `v_proj` is conservative. Adding `k_proj`, `o_proj`, `gate_proj` improves quality at the cost of a larger adapter.
 - **DPO after SFT** — SFT teaches the style; DPO aligns the preference. The combo is standard at production scale. Out of scope for this skill-build.
