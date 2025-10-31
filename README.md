@@ -99,7 +99,7 @@ Source: `win-wang/Machine_Learning_QA_Collection` (~8600 Gemma-format conversati
 - Skip answers under 30 characters (non-answers)
 - Result: ~8000 usable train + ~600 val examples
 
-The format choice matters: the Llama-2 instruction template (`[INST]<<SYS>>`) is used because Mistral-7B-v0.1 was trained with it. Using the wrong template degrades instruction-following without touching model weights.
+The held-out validation set is used for final evaluation so the adapter improvements are measured against a raw model baseline rather than just training loss. The format choice matters: the Llama-2 instruction template (`[INST]<<SYS>>`) is used because Mistral-7B-v0.1 was trained with it. Using the wrong template degrades instruction-following without touching model weights.
 
 ---
 
