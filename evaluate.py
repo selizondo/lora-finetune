@@ -14,11 +14,19 @@ Usage:
 import argparse
 import json
 import math
+import os
+import time
 
 import torch
 import yaml
 from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 
+# System prompt: must match the one used in train.py/inference.py so the model
+# sees the same instruction framing during eval that it was trained on.
+SYSTEM_PROMPT = (
+    "You are an expert ML engineer. Answer the following question clearly and concisely, "
+    "as you would in a technical interview."
+)
 
 EVAL_PROMPTS = [
     "What is LoRA and why is it more efficient than full fine-tuning?",
@@ -92,15 +100,12 @@ def compute_perplexity(model, tokenizer, val_file: str, max_seq_length: int = 51
 
 def qualitative_compare(base_model_path: str, adapter_path: str, cfg: dict):
     """Print side-by-side base vs fine-tuned answers on fixed eval prompts."""
-    SYSTEM = (
-        "You are an expert ML engineer. Answer the following question clearly and concisely, "
-        "as you would in a technical interview."
-    )
     inf_cfg = cfg["inference"]
 
     def answer(model, tokenizer, question: str) -> str:
+        # Uses module-level SYSTEM_PROMPT so this matches training exactly
         prompt = (
-            f"<s>[INST] <<SYS>>\n{SYSTEM}\n<</SYS>>\n\n"
+            f"<s>[INST] <<SYS>>\n{SYSTEM_PROMPT}\n<</SYS>>\n\n"
             f"### Instruction:\n{question}\n\n### Response:\n"
         )
         inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
@@ -137,6 +142,9 @@ def main():
     parser.add_argument("--adapter", required=True, help="Path to LoRA adapter")
     parser.add_argument("--mode", choices=["perplexity", "qualitative", "both"], default="both")
     parser.add_argument("--config", default="config.yaml")
+    # Optional: save perplexity results to JSON so rank-sweep runs can be compared later.
+    # Example: python evaluate.py --adapter ./checkpoints/r8 --out results/r8.json
+    parser.add_argument("--out", default=None, help="JSON path to persist perplexity results")
     args = parser.parse_args()
 
     cfg = load_config(args.config)
@@ -148,11 +156,32 @@ def main():
         ppl = compute_perplexity(model, tokenizer, cfg["data"]["val_file"])
         print(f"\nPerplexity (fine-tuned): {ppl:.2f}")
 
-        # Also compute base model perplexity for comparison
+        # Compute base model perplexity for comparison — the improvement delta
+        # is the meaningful number, not the absolute perplexity value.
         base_model_obj, base_tok = load_model_and_tokenizer(base_model, None, cfg)
         base_ppl = compute_perplexity(base_model_obj, base_tok, cfg["data"]["val_file"])
         print(f"Perplexity (base model): {base_ppl:.2f}")
         print(f"Delta: {base_ppl - ppl:+.2f} (positive = fine-tuned is better)")
+
+        if args.out:
+            # Persist results so rank-sweep runs can be compared without re-running.
+            # WHY JSON instead of just printing: terminal output is ephemeral —
+            # if Colab session dies or you close the tab, results are lost.
+            # Persisting to a file lets you compare e.g. r8 vs r16 vs r32 later.
+            result = {
+                "adapter_path": args.adapter,
+                "base_model": base_model,
+                "lora_rank": cfg["lora"]["r"],
+                "max_train_examples": cfg["training"].get("max_train_examples"),
+                "perplexity_finetuned": round(ppl, 4),
+                "perplexity_base": round(base_ppl, 4),
+                "delta": round(base_ppl - ppl, 4),
+                "evaluated_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
+            }
+            os.makedirs(os.path.dirname(args.out) or ".", exist_ok=True)
+            with open(args.out, "w") as f:
+                json.dump(result, f, indent=2)
+            print(f"\nResults saved to: {args.out}")
 
     if args.mode in ("qualitative", "both"):
         qualitative_compare(base_model, args.adapter, cfg)

@@ -43,6 +43,24 @@ def load_config(path: str) -> dict:
 
 
 def build_bnb_config(cfg: dict) -> BitsAndBytesConfig:
+    """
+    Build the BitsAndBytes 4-bit quantization config.
+
+    WHY 4-bit quantization (QLoRA):
+        Mistral-7B has ~7B parameters. At fp16 (2 bytes each) that's ~14GB —
+        too large for a free Colab T4 (16GB VRAM). 4-bit quantization compresses
+        each weight to 4 bits, reducing memory to ~3.5GB and leaving room for
+        activations, gradients, and optimizer state.
+
+    WHY nf4 (NormalFloat 4-bit) over int4:
+        nf4 is optimised for normally-distributed weights (which neural networks
+        have). It minimises quantization error compared to linear int4 binning,
+        recovering ~1-2 perplexity points at the same memory cost.
+
+    WHY use_nested_quant (double quantization):
+        Quantizes the quantization constants themselves, saving an additional
+        ~0.4 bits per parameter — about 400MB for a 7B model. Small but free.
+    """
     return BitsAndBytesConfig(
         load_in_4bit=cfg["model"]["load_in_4bit"],
         bnb_4bit_compute_dtype=torch.float16,
@@ -52,6 +70,32 @@ def build_bnb_config(cfg: dict) -> BitsAndBytesConfig:
 
 
 def build_lora_config(cfg: dict) -> LoraConfig:
+    """
+    Build the LoRA adapter configuration.
+
+    WHY LoRA instead of full fine-tuning:
+        Full fine-tuning updates all ~7B parameters — requires ~56GB VRAM and
+        hours of compute. LoRA inserts small trainable matrices (rank r=16)
+        into the attention layers, training only ~0.5% of parameters while
+        achieving >90% of the quality gain. We can train on a single T4/A100.
+
+    WHY r=16 (LoRA rank):
+        Rank controls the size of the inserted matrices. r=8 is faster but
+        loses more quality on domain-specific tasks. r=32+ gives diminishing
+        returns while using 2x the parameters. r=16 is the standard default
+        for instruction-tuning tasks of this size (~8K examples).
+
+    WHY alpha = r * 2:
+        lora_alpha is a scaling factor applied to the LoRA output before adding
+        it to the base weight. Setting alpha = 2r is a standard heuristic that
+        keeps the LoRA contribution appropriately scaled regardless of rank —
+        changing r without changing alpha would alter effective learning rate.
+
+    WHY target_modules = attention projections (q_proj, v_proj, etc.):
+        Attention layers capture most of the model's "knowledge" about style and
+        format. Targeting only these (not MLP layers) gives the best quality/
+        parameter tradeoff for instruction-following tasks.
+    """
     lora = cfg["lora"]
     return LoraConfig(
         task_type=TaskType.CAUSAL_LM,
@@ -63,14 +107,31 @@ def build_lora_config(cfg: dict) -> LoraConfig:
     )
 
 
+# System prompt used in every training example AND at inference time.
+# WHY defined at module level (not inline in formatting_func):
+#   It must match the prompt used in evaluate.py and inference.py.
+#   If they diverge, the model was trained expecting one framing and gets
+#   asked questions with a different one — silent quality regression.
+SYSTEM_PROMPT = (
+    "You are an expert ML engineer. Answer the following question clearly "
+    "and concisely, as you would in a technical interview."
+)
+
+
 def formatting_func(example: dict) -> str:
-    """Format one Alpaca-style example into the Llama-2 instruction prompt."""
-    system = (
-        "You are an expert ML engineer. Answer the following question clearly "
-        "and concisely, as you would in a technical interview."
-    )
+    """
+    Format one Alpaca-style example into the Llama-2 instruction prompt.
+
+    WHY Llama-2 chat template (<s>[INST] <<SYS>>...):
+        Mistral-7B-v0.1 was instruction-tuned with this exact template.
+        Using plain text or ChatML means the model doesn't recognise the
+        system block as instructions — it just treats the whole thing as
+        continuable text. Template must match between training and inference.
+
+    The [/INST]</s> closing tag signals end-of-answer during generation.
+    """
     return (
-        f"<s>[INST] <<SYS>>\n{system}\n<</SYS>>\n\n"
+        f"<s>[INST] <<SYS>>\n{SYSTEM_PROMPT}\n<</SYS>>\n\n"
         f"### Instruction:\n{example['instruction']}\n\n"
         f"### Response:\n{example['output']} [/INST]</s>"
     )

@@ -17,6 +17,9 @@ import yaml
 from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 
 
+# System prompt: must match train.py and evaluate.py exactly.
+# If this diverges from training, the model generates answers in the wrong style
+# (the trained format vs the prompted format mismatch causes quality regression).
 SYSTEM_PROMPT = (
     "You are an expert ML engineer. Answer the following question clearly and concisely, "
     "as you would in a technical interview."
@@ -51,7 +54,11 @@ def load_model(base_model: str, adapter_path: str | None, cfg: dict):
         from peft import PeftModel
         print(f"Loading adapter from: {adapter_path}")
         model = PeftModel.from_pretrained(model, adapter_path)
-        model = model.merge_and_unload()  # merge weights for faster inference
+        # merge_and_unload() folds the LoRA delta matrices into the base weights
+        # and removes the PEFT wrapper. WHY: during inference we never need to
+        # update the LoRA matrices — merging eliminates the extra forward pass
+        # through the LoRA branch, giving ~15% faster token generation.
+        model = model.merge_and_unload()
 
     model.eval()
     return model, tokenizer
