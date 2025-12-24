@@ -167,3 +167,13 @@ Alternatives considered or worth exploring — each trades complexity for capabi
 - **Add ROUGE/BERTScore eval** — perplexity is a proxy; task-specific metrics are more honest. Implemented in Project 07 (finetune-case-study) using the eval harness from Project 04.
 - **Expand LoRA targets** — `q_proj` + `v_proj` is conservative. Adding `k_proj`, `o_proj`, `gate_proj` improves quality at the cost of a larger adapter.
 - **DPO after SFT** — SFT teaches the style; DPO aligns the preference. The combo is standard at production scale. Out of scope for this skill-build.
+
+---
+
+## Related Projects
+
+| Project | Connection |
+|---|---|
+| [finetune-case-study](../finetune-case-study) | Controlled 4-way experiment answering the question this repo raises: does fine-tuning actually beat RAG for this task? |
+| [llm-eval-harness](../llm-eval-harness) | The judge pattern used in finetune-case-study's eval loop originates here — same scoring rubric, same Haiku judge |
+| [rag-pipeline-from-scratch](../rag-pipeline-from-scratch) | The RAG baseline this fine-tune is compared against; same dataset, same test set |
