@@ -61,6 +61,28 @@ Decisions made during build, with the reasoning and scale/complexity boundaries 
 
 ---
 
+## FT vs RAG: Baseline Comparison
+
+The README claims ~65% accuracy (fine-tuned) vs ~70% (RAG) for ML Q&A. To make this
+verifiable in code rather than prose, a BM25 retrieval baseline is implemented at
+`baseline/bm25_baseline.py`.
+
+**How to compare:**
+
+```bash
+# Run BM25 retrieval baseline (no GPU needed)
+python baseline/bm25_baseline.py --train data/train.jsonl --out results/bm25.json
+
+# Run fine-tuned model metrics (requires GPU + trained adapter)
+python evaluate.py --adapter ./checkpoints/final --mode metrics --out results/ft.json
+```
+
+The BM25 baseline retrieves the top-1 training answer by BM25 similarity and reports
+ROUGE-L + exact-match on the same 20-question benchmark used in `evaluate.py`. If the
+fine-tuned model's ROUGE-L is lower than BM25, fine-tuning did not help on this benchmark.
+
+---
+
 ## What Was Cut
 
 | Cut | Reason | Upgrade trigger |

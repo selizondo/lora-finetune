@@ -2,6 +2,11 @@
 
 model:
   base: "mistralai/Mistral-7B-v0.1"     # swap to "meta-llama/Meta-Llama-3-8B" if preferred
+  # chat_template: single source of truth for the instruction wrapper.
+  # WHY here rather than in code: if the template drifts between train/eval/inference,
+  # the model silently generates low-quality answers — no error is raised.
+  # Centralising in config.yaml lets all scripts validate against one value.
+  chat_template: "llama_2"              # must match the template used at training time
   load_in_4bit: true
   bnb_4bit_compute_dtype: "float16"
   bnb_4bit_quant_type: "nf4"

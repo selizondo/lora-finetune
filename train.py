@@ -22,6 +22,7 @@ Colab A100 (free tier): ~40 min for 1000 examples, 3 epochs, r=16
 from __future__ import annotations
 
 import argparse
+import logging
 import os
 
 import torch
@@ -35,6 +36,10 @@ from transformers import (
     TrainingArguments,
 )
 from trl import SFTTrainer
+
+from utils import check_gpu_memory, validate_chat_template, validate_tokenizer_template
+
+logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
 
 def load_config(path: str) -> dict:
@@ -154,6 +159,10 @@ def main() -> None:
 
     cfg = load_config(args.config)
 
+    # Validate config before any expensive work (Items 2 & 3).
+    validate_chat_template(cfg)
+    check_gpu_memory(min_gb_required=10.0)
+
     # CLI overrides for experiment sweeps
     if args.rank is not None:
         cfg["lora"]["r"] = args.rank
@@ -179,6 +188,7 @@ def main() -> None:
     tokenizer = AutoTokenizer.from_pretrained(base_model, trust_remote_code=True)
     tokenizer.pad_token = tokenizer.eos_token
     tokenizer.padding_side = "right"  # required for SFTTrainer with causal LM
+    validate_tokenizer_template(tokenizer, cfg)  # no-op if tokenizer has no built-in template
 
     model = AutoModelForCausalLM.from_pretrained(
         base_model,

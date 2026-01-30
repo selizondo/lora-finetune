@@ -10,11 +10,21 @@ Usage:
 """
 
 import argparse
+import logging
 import sys
 
 import torch
 import yaml
 from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
+
+from utils import (
+    check_gpu_memory,
+    validate_adapter_base_model,
+    validate_chat_template,
+    validate_tokenizer_template,
+)
+
+logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
 
 # System prompt: must match train.py and evaluate.py exactly.
@@ -104,10 +114,17 @@ def main():
     cfg = load_config(args.config)
     base_model = args.base or cfg["model"]["base"]
 
+    # Pre-flight checks (Items 1, 2, 3) — fail fast before any expensive downloads.
+    validate_chat_template(cfg)
+    check_gpu_memory(min_gb_required=10.0)
+    if args.adapter:
+        validate_adapter_base_model(args.adapter, base_model)
+
     print(f"Loading model: {base_model}")
     if args.adapter:
         print(f"Adapter: {args.adapter}")
     model, tokenizer = load_model(base_model, args.adapter, cfg)
+    validate_tokenizer_template(tokenizer, cfg)
 
     if args.prompt:
         prompt = build_prompt(args.prompt)
