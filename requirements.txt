@@ -1,12 +1,13 @@
-# Install in Colab with:
+# Install on EC2 / macOS / Colab:
 #   pip install -r requirements.txt
 #
-# Colab already has torch; this adds the fine-tuning stack on top.
+# torch is pre-installed on the AWS Deep Learning AMI and Colab — not listed here.
+# Platform: macOS and Linux/Unix only (Windows paths removed).
 
 transformers>=4.40.0
 peft>=0.10.0
-trl>=0.8.6
-bitsandbytes>=0.43.0
+trl>=1.0.0
+bitsandbytes>=0.44.0
 accelerate>=0.29.0
 datasets>=2.19.0
 scipy>=1.13.0

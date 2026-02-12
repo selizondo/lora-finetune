@@ -84,8 +84,10 @@ if IN_COLAB:
     LOCAL_DATA    = '/content/data'
     LOCAL_CKPT    = '/content/checkpoints'
 else:
-    # Local paths
-    DRIVE_BASE    = 'c:/Users/selizondo/projects/selizondo/coding_labs/lora-finetune'
+    # EC2 / macOS / local Unix paths.
+    # Override RESULTS_DIR env var to redirect output (e.g. RESULTS_DIR=/home/ubuntu/lora-finetune).
+    import pathlib
+    DRIVE_BASE    = os.environ.get('RESULTS_DIR', str(pathlib.Path(__file__).resolve().parent))
     DATASET_DIR   = DRIVE_BASE + '/datasets'
     DRIVE_RESULTS = DRIVE_BASE + '/results'
     LOCAL_DATA    = DRIVE_BASE + '/data'
@@ -535,7 +537,8 @@ if IN_COLAB:
     files.download(zip_path)
 else:
     print()
-    print('Local run — results are at:', DRIVE_RESULTS)
+    print('Results at:', DRIVE_RESULTS)
+    print('Sync back with: scp -r ubuntu@<EC2_IP>:' + DRIVE_RESULTS + ' ./results/')
 
 print()
 print('Copy results/*.json into lora-finetune/docs/ then update README.md.')
@@ -579,7 +582,8 @@ else:
     try:
         _results = DRIVE_RESULTS
     except NameError:
-        _results = 'c:/Users/selizondo/projects/selizondo/coding_labs/lora-finetune/results'
+        import pathlib
+        _results = os.environ.get('RESULTS_DIR', str(pathlib.Path(__file__).resolve().parent)) + '/results'
 
 def _load(path):
     return json.load(open(path)) if os.path.exists(path) else None
@@ -616,5 +620,6 @@ if _in_colab:
     colab_files.download(zip_path)
     print('Done.')
 else:
-    print('\nLocal run — results already on disk at:', _results)
+    print('\nResults on disk at:', _results)
+    print('Sync back with: scp -r ubuntu@<EC2_IP>:' + _results + ' ./results/')
 
