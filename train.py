@@ -29,13 +29,8 @@ import torch
 import yaml
 from datasets import load_dataset
 from peft import LoraConfig, TaskType, get_peft_model, prepare_model_for_kbit_training
-from transformers import (
-    AutoModelForCausalLM,
-    AutoTokenizer,
-    BitsAndBytesConfig,
-    TrainingArguments,
-)
-from trl import SFTTrainer
+from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
+from trl import SFTTrainer, SFTConfig
 
 from utils import check_gpu_memory, validate_chat_template, validate_tokenizer_template
 
@@ -205,34 +200,35 @@ def main() -> None:
 
     # ── Data ──────────────────────────────────────────────────────────────────
     train_ds = load_jsonl(cfg["data"]["train_file"], max_examples)
+    # Pre-format so trl 1.x reads a concrete text column (formatting_func deprecated).
+    train_ds = train_ds.map(lambda ex: {"text": formatting_func(ex)}, remove_columns=train_ds.column_names)
     print(f"\nTraining on {len(train_ds)} examples")
 
     # ── Training args ─────────────────────────────────────────────────────────
     t = cfg["training"]
-    training_args = TrainingArguments(
-        output_dir=output_dir,
-        num_train_epochs=t["epochs"],
-        per_device_train_batch_size=t["batch_size"],
-        gradient_accumulation_steps=t["gradient_accumulation_steps"],
-        learning_rate=t["learning_rate"],
-        lr_scheduler_type=t["lr_scheduler"],
-        warmup_ratio=t["warmup_ratio"],
-        fp16=True,
-        logging_steps=t["logging_steps"],
-        save_strategy="epoch",
-        save_total_limit=2,
-        report_to="none",
-        optim="paged_adamw_32bit",
-        group_by_length=True,  # pads to longest seq per batch — reduces wasted FLOPS
-    )
-
     trainer = SFTTrainer(
         model=model,
-        args=training_args,
+        args=SFTConfig(
+            output_dir=output_dir,
+            num_train_epochs=t["num_train_epochs"],
+            per_device_train_batch_size=t["per_device_train_batch_size"],
+            gradient_accumulation_steps=t["gradient_accumulation_steps"],
+            learning_rate=t["learning_rate"],
+            lr_scheduler_type=t["lr_scheduler_type"],
+            warmup_ratio=t["warmup_ratio"],
+            fp16=True,
+            gradient_checkpointing=True,
+            gradient_checkpointing_kwargs={"use_reentrant": False},
+            logging_steps=t["logging_steps"],
+            save_strategy=t.get("save_strategy", "epoch"),
+            save_total_limit=2,
+            report_to="none",
+            optim="paged_adamw_32bit",
+            dataset_text_field="text",
+            max_seq_length=cfg["data"]["max_seq_length"],
+        ),
         train_dataset=train_ds,
-        formatting_func=formatting_func,
-        max_seq_length=cfg["model"]["max_seq_length"],
-        tokenizer=tokenizer,
+        processing_class=tokenizer,
     )
 
     print("\nStarting training...")
