@@ -32,9 +32,25 @@ from peft import LoraConfig, TaskType, get_peft_model, prepare_model_for_kbit_tr
 from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 from trl import SFTTrainer, SFTConfig
 
+import subprocess
+
 from utils import check_gpu_memory, validate_chat_template, validate_tokenizer_template
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
+
+
+def _s3_sync(project: str, local_dir: str, artifact_type: str) -> None:
+    """Sync local artifacts to S3 if S3_ARTIFACTS_BUCKET is set. Non-fatal on failure."""
+    bucket = os.getenv("S3_ARTIFACTS_BUCKET", "travissketch-portfolio-artifacts")
+    s3_path = f"s3://{bucket}/{project}/{artifact_type}/"
+    print(f"\nSyncing {artifact_type} → {s3_path}")
+    result = subprocess.run(
+        ["aws", "s3", "sync", local_dir + "/", s3_path,
+         "--exclude", "*.pyc", "--exclude", "__pycache__/*"],
+        capture_output=False,
+    )
+    if result.returncode != 0:
+        print(f"[warn] S3 sync failed (non-fatal) — artifacts remain at {local_dir}")
 
 
 def load_config(path: str) -> dict:
@@ -239,6 +255,9 @@ def main() -> None:
     trainer.model.save_pretrained(final_path)
     tokenizer.save_pretrained(final_path)
     print(f"\nAdapter saved to: {final_path}")
+
+    _s3_sync("lora-finetune", output_dir, "adapter")
+
     print(f"\nNext steps:")
     print(f"  python evaluate.py --adapter {final_path} --mode both")
     print(f"  python inference.py --adapter {final_path} --interactive")
