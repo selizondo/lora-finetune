@@ -170,6 +170,14 @@ Alternatives considered or worth exploring — each trades complexity for capabi
 
 ---
 
+## Architectural Standard
+
+The adapter weights are ephemeral — they live on a T4 for the duration of a training run. The reproducibility is the deliverable: every hyperparameter in `config.yaml`, rank sweep results persisted to Drive, data scaling curve documented so the "how much data do I need?" question has a measured answer rather than a guess.
+
+The rank sweep (r=8/16/64 perplexity comparison) is the reusable methodology: run it once on your domain, document the breakeven point, and future fine-tuning decisions start from evidence. The "What I'd Do Differently" section is the honest handoff — Unsloth for speed, DPO after SFT for alignment, expanded LoRA targets for quality. These are the production-grade upgrades, documented at the decision site rather than left as future tribal knowledge.
+
+---
+
 ## Related Projects
 
 | Project | Connection |
