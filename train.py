@@ -41,7 +41,7 @@ logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
 def _s3_sync(project: str, local_dir: str, artifact_type: str) -> None:
     """Sync local artifacts to S3 if S3_ARTIFACTS_BUCKET is set. Non-fatal on failure."""
-    bucket = os.getenv("S3_ARTIFACTS_BUCKET", "travissketch-portfolio-artifacts")
+    bucket = os.getenv("S3_ARTIFACTS_BUCKET")
     s3_path = f"s3://{bucket}/{project}/{artifact_type}/"
     print(f"\nSyncing {artifact_type} → {s3_path}")
     result = subprocess.run(
