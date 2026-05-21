@@ -182,6 +182,6 @@ The rank sweep (r=8/16/64 perplexity comparison) is the reusable methodology: ru
 
 | Project | Connection |
 |---|---|
-| [finetune-case-study](../finetune-case-study) | Controlled 4-way experiment answering the question this repo raises: does fine-tuning actually beat RAG for this task? |
-| [llm-eval-harness](../llm-eval-harness) | The judge pattern used in finetune-case-study's eval loop originates here — same scoring rubric, same Haiku judge |
-| [rag-pipeline-from-scratch](../rag-pipeline-from-scratch) | The RAG baseline this fine-tune is compared against; same dataset, same test set |
+| [finetune-case-study](https://github.com/selizondo/finetune-case-study) | Controlled 4-way experiment answering the question this repo raises: does fine-tuning actually beat RAG for this task? |
+| [llm-eval-harness](https://github.com/selizondo/llm-eval-harness) | The judge pattern used in finetune-case-study's eval loop originates here — same scoring rubric, same Haiku judge |
+| [rag-pipeline-from-scratch](https://github.com/selizondo/rag-pipeline-from-scratch) | The RAG baseline this fine-tune is compared against; same dataset, same test set |
