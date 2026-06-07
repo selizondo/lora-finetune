@@ -1,7 +1,5 @@
 # LoRA Fine-Tuning
 
-![Tests](https://github.com/selizondo/lora-finetune/actions/workflows/test.yml/badge.svg)
-
 Most teams fine-tune a model and measure training loss. Training loss is not the answer to "did it work." The real question is whether the fine-tuned model outperforms the alternative, at what data volume fine-tuning becomes worth the ops cost, and how much rank matters. This project answers all three with a controlled rank sweep and a data scaling curve on an 8K ML Q&A dataset.
 
 The short answer: rank matters less than you think. Data volume matters more. And at 8K examples, RAG still wins on accuracy.
