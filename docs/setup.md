@@ -1,5 +1,19 @@
 # Setup and Usage
 
+## Key Concepts
+
+**QLoRA:** Quantized Low-Rank Adaptation. 4-bit quantization of the base model (Mistral-7B: 14GB → 4GB) plus LoRA adapters (~0.5% of parameters trainable). Fits a 7B model into Colab T4 (15GB VRAM). Tradeoff: quantization noise + adapter approximation vs full-parameter expressiveness. For domain adaptation under 10K examples, QLoRA matches full fine-tune quality within noise.
+
+**LoRA rank:** Adapter capacity parameter. Rank=8 uses 25% of rank=64 parameters but achieves 95% of the quality. The rank sweep measured this on 1K examples, 3 epochs: diminishing returns above r=16. Domain adaptation for Q&A lives in a low-dimensional subspace.
+
+**4-bit quantization (bitsandbytes):** Reduces base weights from fp16 (14GB) to nf4 (4GB). Uses `bitsandbytes` with specific flags: `bnb_4bit_use_double_quant=True`, `bnb_4bit_quant_type='nf4'`, `bnb_4bit_compute_dtype=torch.bfloat16`. No model-accuracy impact for inference; training sees minimal difference on domain adaptation tasks.
+
+**Perplexity metric:** Measures language modeling quality on held-out validation set. Lower is better. Used to compare rank sweep (r=8, r=16, r=64) and data scaling (n=100 to n=1000). Perplexity increases at epoch 3 for small datasets (n=100), signal of overfitting.
+
+**Data scaling curve:** Meaningful gains from 100 to 500 examples. Beyond 500, gains plateau until data quality improves. The inflection point (500 examples) is more useful than rank sweep: teams collecting data should verify they are past 500 before investing in 5,000.
+
+---
+
 ## Prerequisites
 
 - GPU required: 15GB+ VRAM. Free Colab T4 works.

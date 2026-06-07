@@ -8,6 +8,15 @@ The short answer: rank matters less than you think. Data volume matters more. An
 
 **Stack:** Python · HuggingFace peft + trl · bitsandbytes 4-bit · Mistral-7B · Colab T4
 
+## Related Projects
+
+1. [finetune-case-study](https://github.com/selizondo/finetune-case-study) — controlled 4-way comparison: fine-tune vs RAG vs both
+2. [llm-eval-harness](https://github.com/selizondo/llm-eval-harness) — judge scoring pattern used in evaluation
+
+*Companion post: [When Does Fine-Tuning Actually Help?](docs/blog_post.md) — AI Systems in Production series, coming soon*
+
+---
+
 ## Results
 
 Measured on a held-out validation set. Results pending Colab T4 run (see [docs/setup.md](docs/setup.md) to reproduce).
@@ -43,11 +52,6 @@ The rank sweep was run to answer "how much adapter capacity does this task need?
 ### 500 examples is the data quality inflection point
 
 Meaningful perplexity gains appear from 100 to 500 examples. Beyond 500, gains plateau until data quality improves. This is the more useful finding than the rank sweep: teams debating "should I collect 2,000 examples or 5,000?" should first verify they are past the 500-example plateau. Beyond that, quantity is not the bottleneck.
-
-**Companion post:** "When Does Fine-Tuning Actually Help?" (AI Systems in Production series, coming soon)
-**Related projects:** [finetune-case-study](https://github.com/selizondo/finetune-case-study) (controlled 4-way comparison answering whether fine-tuning beats RAG) · [llm-eval-harness](https://github.com/selizondo/llm-eval-harness) (the judge scoring pattern used in evaluation)
-
----
 
 ## Go Deeper
 
